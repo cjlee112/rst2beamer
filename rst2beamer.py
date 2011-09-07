@@ -43,9 +43,9 @@ except:
 from docutils.core import publish_cmdline, default_description
 from docutils.writers.latex2e import Writer as Latex2eWriter
 from docutils.writers.latex2e import LaTeXTranslator, DocumentClass
-from docutils import nodes
+from docutils import nodes, utils
 from docutils.nodes import fully_normalize_name as normalize_name
-from docutils.parsers.rst import directives, Directive
+from docutils.parsers.rst import directives, Directive, roles
 from docutils import frontend
 from docutils.writers.latex2e import PreambleCmds
 ## CONSTANTS & DEFINES ###
@@ -479,6 +479,19 @@ class beamer_note (nodes.container):
     """
     pass
 
+## copied from sphinx.ext.mathbase
+
+class math(nodes.Inline, nodes.TextElement):
+    pass
+
+class displaymath(nodes.Part, nodes.Element):
+    pass
+
+class eqref(nodes.Inline, nodes.TextElement):
+    pass
+
+
+
 
 ### DIRECTIVES
 
@@ -712,6 +725,57 @@ class beamer_section (Directive):
 
 for name in ['beamer_section', 'r2b-section', 'r2b_section']:
     directives.register_directive (name, beamer_section)
+
+
+## copied from sphinx.ext.mathbase
+
+class MathDirective(Directive):
+
+    has_content = True
+    required_arguments = 0
+    optional_arguments = 1
+    final_argument_whitespace = True
+    option_spec = {
+        'label': directives.unchanged,
+        'nowrap': directives.flag,
+    }
+
+    def run(self):
+        latex = '\n'.join(self.content)
+        if self.arguments and self.arguments[0]:
+            latex = self.arguments[0] + '\n\n' + latex
+        node = displaymath()
+        node['latex'] = latex
+        node['label'] = self.options.get('label', None)
+        node['nowrap'] = 'nowrap' in self.options
+        # node['docname'] = self.state.document.settings.env.docname
+        ret = [node]
+        if node['label']:
+            tnode = nodes.target('', '', ids=['equation-' + node['label']])
+            self.state.document.note_explicit_target(tnode)
+            ret.insert(0, tnode)
+        return ret
+
+directives.register_directive('math', MathDirective)
+
+### ROLES
+
+## copied from sphinx.ext.mathbase
+    
+def math_role(role, rawtext, text, lineno, inliner, options={}, content=[]):
+    latex = utils.unescape(text, restore_backslashes=True)
+    obj = math(latex=latex)
+    obj.document = inliner.document # docutils crashes w/o this
+    return [obj], []
+
+def eq_role(role, rawtext, text, lineno, inliner, options={}, content=[]):
+    text = utils.unescape(text)
+    node = eqref('(?)', '(?)', target=text)
+    node['docname'] = inliner.document.settings.env.docname
+    return [node], []
+
+roles.register_local_role('math', math_role)
+roles.register_local_role('eq', eq_role)
 
 
 ### WRITER
@@ -1266,6 +1330,32 @@ class BeamerTranslator (LaTeXTranslator):
             # currently the LaTeXTranslator does nothing, but just in case
             LaTeXTranslator.depart_container (self, node)
 
+    ## copied from sphinx.ext.mathbase
+
+    def visit_math(self, node):
+        self.body.append('$' + node['latex'] + '$')
+        raise nodes.SkipNode
+
+    def visit_displaymath(self, node):
+        if node['nowrap']:
+            self.body.append(node['latex'])
+        else:
+            label = node['label'] and node['docname'] + '-' + node['label'] or None
+            self.body.append(wrap_displaymath(node['latex'], label))
+        raise nodes.SkipNode
+
+    def visit_eqref(self, node):
+        self.body.append('\\eqref{%s-%s}' % (node['docname'], node['target']))
+        raise nodes.SkipNode
+
+
+def wrap_displaymath(math, label):
+    'just removes blank lines from math'
+    s = '\n\\['
+    for line in math.split('\n'):
+        if line:
+            s += line + '\n'
+    return s + '\\]\n'
 
 class BeamerWriter (Latex2eWriter):
         """
