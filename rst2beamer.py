@@ -167,6 +167,16 @@ BEAMER_SPEC =   (
                     'default':   'guess',
                 }
             ),
+            # include pdfpages package?
+            (
+                "turn on usepackage{pdfpages}. ",
+                ['--use-pdfpages'],
+                {
+                    'action':    "store_true",
+                    'dest':      'use_pdfpages',
+                    'default':   False,
+                }
+            ),
         ] + list (Latex2eWriter.settings_spec[2][2:])
     ),
 )
@@ -856,6 +866,8 @@ class BeamerTranslator (LaTeXTranslator):
             option_str = 'show notes on second screen=%s' % notes_posn
         if use_pgfpages:
             self.head_prefix.append ('\\usepackage{pgfpages}\n')
+        if self.settings.use_pdfpages:
+            self.head_prefix.append ('\\usepackage{pdfpages}\n\setbeamercolor{background canvas}{bg=}\n')
         self.head_prefix.append ('\\setbeameroption{%s}\n' % option_str)
 
         if (self.cb_use_pygments):
@@ -882,26 +894,8 @@ class BeamerTranslator (LaTeXTranslator):
 
 
     def depart_document(self, node):
-        # Complete header with information gained from walkabout
-        # a) conditional requirements (before style sheet)
-        self.requirements = self.requirements.sortedvalues()
-        # b) coditional fallback definitions (after style sheet)
-        self.fallbacks = self.fallbacks.sortedvalues()
-        # c) PDF properties
-        self.pdfsetup.append(PreambleCmds.linking % (self.colorlinks,
-                                                     self.hyperlink_color,
-                                                     self.hyperlink_color))
-        if self.pdfauthor:
-            authors = self.author_separator.join(self.pdfauthor)
-            self.pdfinfo.append('  pdfauthor={%s}' % authors)
-        if self.pdfinfo:
-            self.pdfsetup += [r'\hypersetup{'] + self.pdfinfo + ['}']
-        # Complete body
-        # a) document title (part 'body_prefix'):
-        # NOTE: Docutils puts author/date into docinfo, so normally
-        #       we do not want LaTeX author/date handling (via \maketitle).
-        #       To deactivate it, we add \title, \author, \date,
-        #       even if the arguments are empty strings.
+        'customize document title a la beamer'
+        LaTeXTranslator.depart_document(self, node)
         if self.title or self.author_stack or self.date:
             authors = ['\\\\\n'.join(author_entry)
                        for author_entry in self.author_stack]
@@ -923,30 +917,7 @@ class BeamerTranslator (LaTeXTranslator):
             else:
                 docinfo_list.append(self.organization)
                 docinfo_str = docinfo_w_institute % tuple(docinfo_list)
-            self.body_pre_docinfo.append(docinfo_str)
-        # b) bibliography
-        # TODO insertion point of bibliography should be configurable.
-        if self._use_latex_citations and len(self._bibitems)>0:
-            if not self.bibtex:
-                widest_label = ''
-                for bi in self._bibitems:
-                    if len(widest_label)<len(bi[0]):
-                        widest_label = bi[0]
-                self.out.append('\n\\begin{thebibliography}{%s}\n' %
-                                 widest_label)
-                for bi in self._bibitems:
-                    # cite_key: underscores must not be escaped
-                    cite_key = bi[0].replace(r'\_','_')
-                    self.out.append('\\bibitem[%s]{%s}{%s}\n' %
-                                     (bi[0], cite_key, bi[1]))
-                self.out.append('\\end{thebibliography}\n')
-            else:
-                self.out.append('\n\\bibliographystyle{%s}\n' %
-                                self.bibtex[0])
-                self.out.append('\\bibliography{%s}\n' % self.bibtex[1])
-        # c) make sure to generate a toc file if needed for local contents:
-        if 'minitoc' in self.requirements and not self.has_latex_toc:
-            self.out.append('\n\\faketableofcontents % for local ToCs\n')
+            self.body_pre_docinfo[:] = [docinfo_str] # replace default title
 
 
 
