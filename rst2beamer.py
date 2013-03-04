@@ -1091,7 +1091,7 @@ class BeamerTranslator (LaTeXTranslator):
         if (self.section_level == self.frame_level):#0
             self.out.append (self.end_frametag())
         try: # insert raw code defered to after endframe
-            self.out.append(node._raw_append)
+            self.out.append('\n'.join(node._raw_append))
         except AttributeError:
             pass
 
@@ -1102,7 +1102,10 @@ class BeamerTranslator (LaTeXTranslator):
         if 'latex' in node.get('format', '').split() and \
            'rst2beamer:endframe' in txt and \
            isinstance(parent, nodes.section):
-            parent._raw_append = txt # defer this until after endframe
+            try: # defer this until after endframe
+                parent._raw_append.append(txt)
+            except AttributeError:
+                parent._raw_append = [txt]
             raise nodes.SkipNode
         else: # insert here as usual
             LaTeXTranslator.visit_raw (self, node)
