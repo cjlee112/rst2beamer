@@ -177,6 +177,15 @@ BEAMER_SPEC =   (
                     'default':   False,
                 }
             ),
+            (
+                'Specify document title.',
+                ['--doctitle'],
+                {
+                    'action':    'store',
+                    'dest':      'doctitle',
+                    'default': None, 
+                }
+            ),
         ] + list (Latex2eWriter.settings_spec[2][2:])
     ),
 )
@@ -869,6 +878,9 @@ class BeamerTranslator (LaTeXTranslator):
         if self.settings.use_pdfpages:
             self.head_prefix.append ('\\usepackage{pdfpages}\n\setbeamercolor{background canvas}{bg=}\n')
         self.head_prefix.append ('\\setbeameroption{%s}\n' % option_str)
+
+        if self.settings.doctitle:
+            self.title = [self.settings.doctitle]
 
         if (self.cb_use_pygments):
             from pygments.formatters import LatexFormatter
