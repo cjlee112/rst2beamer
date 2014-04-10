@@ -1335,7 +1335,7 @@ class BeamerTranslator (LaTeXTranslator):
     ## copied from sphinx.ext.mathbase
 
     def visit_math(self, node):
-        self.body.append('$' + node['latex'] + '$')
+        self.out.append('$' + node['latex'] + '$')
         raise nodes.SkipNode
 
     def visit_displaymath(self, node):
